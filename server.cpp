@@ -13,6 +13,12 @@
 
 using namespace std;
 
+int nrOfPlayers;
+int *pectators;
+int nrOfSpectators;
+int Gameqeueu[50];
+int qeueu = 0;
+
 string removeWord(string str, string word)
 {
     // Check if the word is present in string
@@ -39,6 +45,60 @@ string removeWord(string str, string word)
 
     // Return the resultant string
     return str;
+}
+int Winner(int p1, int p2)
+{
+    int win = 0;
+    //1: Rock 2: Paper 3: Scissors
+    //WIN: 1: p1 winns. 2: p2 winns. 0: Draw
+    switch (p1)
+    {
+    case 1:
+        if (p2 == 1)
+            win = 0;
+        else if (p2 == 2)
+            win = 2;
+        else if (p2 == 3)
+            win = 1;
+        else
+            win = 1;
+
+        break;
+    case 2:
+        if (p2 == 1)
+            win = 1;
+        else if (p2 == 2)
+            win = 0;
+        else if (p2 == 3)
+            win = 2;
+        else
+            win = 1;
+        break;
+    case 3:
+        if (p2 == 1)
+            win = 2;
+        else if (p2 == 2)
+            win = 1;
+        else if (p2 == 3)
+            win = 0;
+        else
+            win = 1;
+        break;
+    default:
+        if (p2 != 1 || p2 != 2 || p2 != 3)
+        {
+            win = 0;
+        }
+        else
+        {
+            win = 2;
+        }
+        break;
+    }
+}
+string Menu()
+{
+    return ("Please select:\n1:Play\n2:Watch\n3:Exit\n");
 }
 
 int main(int argc, char *argv[])
@@ -71,7 +131,7 @@ int main(int argc, char *argv[])
     int nrOfClient = 0;
     int yes = 1;
     int bytesRecived;
-    string nicknames[MAXCLIENTS];
+    string cmds[4] = {"OK\n", "1\n", "2\n", "3\n"};
 
     struct addrinfo hint, *servinfo, *p;
     memset(&hint, 0, sizeof(hint));
@@ -87,7 +147,7 @@ int main(int argc, char *argv[])
     }
 
     //Loop trough all the information and try to make a sockt
-    for (p = servinfo; p != NULL; p->ai_next)
+    for (p = servinfo; p != NULL; p = p->ai_next)
     {
         listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (listener < 0)
@@ -166,7 +226,7 @@ int main(int argc, char *argv[])
                         {
                             fdmax = newfd;
                         }
-                        if (send(newfd, "1.0\n", sizeof("1.0\n"), 0) < 0)
+                        if (send(newfd, "1.0\n", strlen("1.0\n"), 0) < 0)
                         {
                             printf("Sending.\n");
                         }
@@ -180,7 +240,6 @@ int main(int argc, char *argv[])
                     if (bytesRecived <= 0)
                     {
                         printf("Remove client.\n");
-                        nicknames[i] = "";
                         close(i);
                         FD_CLR(i, &master);
                     }
@@ -192,10 +251,58 @@ int main(int argc, char *argv[])
                     2:Watch (List all the active games and give the cilet a choise)
                     0: Exit
                     */
+                    if (strcmp(buf, cmds[0].c_str()) == 0)
+                    { //cmds[0]=="OK\n"
+                        //The client supports the prorocols
+                        printf("The client supports the prorocols\n");
+                        if (send(i, Menu().c_str(), Menu().length(), 0) < 0)
+                        {
+                            printf("Sending.\n");
+                        }
+                    }
+                    else if (strcmp(buf, cmds[1].c_str()) == 0)
+                    { //cmds[1]=="1\n"
+                        //The client wanst to play
+                        printf("The client wants to play\n");
+                        nrOfPlayers++;
+                        qeueu++;
+                        if (qeueu % 2 == 0)
+                        {
+                            //Game is ready
+                            if (send(i, "Game is ready\n", strlen("Game is ready\n"), 0) < 0)
+                            {
+                                printf("Sending.\n");
+                            }
+                        }
+                        else
+                        {
+                            //Not enough players, put in qeueu
+                            Gameqeueu[qeueu] = i;
+                            if (send(i, "Not enouth players, putting you in qeueu\n.", strlen("Not enouth players, putting you in qeueu\n."), 0) < 0)
+                            {
+                                printf("Sending.\n");
+                            }
+                        }
+                    }
+                    else if (strcmp(buf, cmds[2].c_str()) == 0)
+                    { //cmds[2]=="2\n"
+                        //The client wats to watch
+                        printf("The client wants to watch\n");
+                    }
+                    else if (strcmp(buf, cmds[3].c_str()) == 0)
+                    { //cmds[3]=="3\n"
+                        //The client wats to exit
+                        printf("The client wants to exit\n");
+                        printf("Remove client.\n");
+                        close(i);
+                        FD_CLR(i, &master);
+                    }
+                    else
+                    {
+                        printf("Wrong command. You sent: %s", buf);
+                    }
 
-
-
-                    printf("New message.\n");
+                    //printf("New message.\n");
                 }
             }
         }
