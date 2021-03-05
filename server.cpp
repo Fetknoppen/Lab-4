@@ -19,6 +19,21 @@ int nrOfSpectators;
 int Gamequeue[50];
 int qeueu = 0;
 
+struct game
+{
+    int player1;
+    int player2;
+    int player1Score = 0;
+    int player2Score = 0;
+    int rounds = 0;
+    time_t timer = time(0);
+    bool active = false;
+};
+int nrOfGames = 0;
+game games[25];
+
+
+
 string removeWord(string str, string word)
 {
     // Check if the word is present in string
@@ -105,10 +120,12 @@ void removeFromQeueu(int sock)
 {
     for (int i = 0; i < qeueu; i++)
     {
-        if(Gamequeue[i] == sock){
+        if (Gamequeue[i] == sock)
+        {
             //Found the client
-            for(int j = i; j < qeueu; j++){
-                Gamequeue[j] = Gamequeue[j+1];
+            for (int j = i; j < qeueu; j++)
+            {
+                Gamequeue[j] = Gamequeue[j + 1];
             }
             qeueu--;
             break;
@@ -121,6 +138,16 @@ void sendMsg(int sock, string msg)
     {
         printf("Sending.\n");
     }
+}
+void newGame(int p1, int p2)
+{
+    removeFromQeueu(p1);
+    removeFromQeueu(p2);
+    games[nrOfGames].player1 = p1;
+    games[nrOfGames].player2 = p2;
+    games[nrOfGames].rounds = 0;
+    games[nrOfGames].active = true;
+    nrOfGames++;
 }
 
 int main(int argc, char *argv[])
@@ -314,6 +341,12 @@ int main(int argc, char *argv[])
                     { //cmds[2]=="2\n"
                         //The client wats to watch
                         printf("The client wants to watch\n");
+                        printf("Nr of acrive games: %d\n", nrOfGames);
+                        string allGames = "";
+                        for (int j = 0; j < nrOfGames; j++)
+                        {
+                            printf("Game %d\n", j);
+                        }
                     }
                     else if (strcmp(buf, cmds[3].c_str()) == 0)
                     { //cmds[3]=="3\n"
