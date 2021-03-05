@@ -16,7 +16,7 @@ using namespace std;
 int nrOfPlayers;
 int *pectators;
 int nrOfSpectators;
-int Gameqeueu[50];
+int Gamequeue[50];
 int qeueu = 0;
 
 string removeWord(string str, string word)
@@ -99,6 +99,28 @@ int Winner(int p1, int p2)
 string Menu()
 {
     return ("Please select:\n1:Play\n2:Watch\n3:Exit\n");
+}
+
+void removeFromQeueu(int sock)
+{
+    for (int i = 0; i < qeueu; i++)
+    {
+        if(Gamequeue[i] == sock){
+            //Found the client
+            for(int j = i; j < qeueu; j++){
+                Gamequeue[j] = Gamequeue[j+1];
+            }
+            qeueu--;
+            break;
+        }
+    }
+}
+void sendMsg(int sock, string msg)
+{
+    if (send(sock, msg.c_str(), msg.length(), 0) < 0)
+    {
+        printf("Sending.\n");
+    }
 }
 
 int main(int argc, char *argv[])
@@ -240,6 +262,7 @@ int main(int argc, char *argv[])
                     if (bytesRecived <= 0)
                     {
                         printf("Remove client.\n");
+                        removeFromQeueu(i);
                         close(i);
                         FD_CLR(i, &master);
                     }
@@ -251,6 +274,8 @@ int main(int argc, char *argv[])
                     2:Watch (List all the active games and give the cilet a choise)
                     0: Exit
                     */
+
+                    //Player is NOT in qeueu
                     if (strcmp(buf, cmds[0].c_str()) == 0)
                     { //cmds[0]=="OK\n"
                         //The client supports the prorocols
@@ -263,26 +288,27 @@ int main(int argc, char *argv[])
                     else if (strcmp(buf, cmds[1].c_str()) == 0)
                     { //cmds[1]=="1\n"
                         //The client wanst to play
-                        printf("The client wants to play\n");
-                        nrOfPlayers++;
-                        qeueu++;
-                        if (qeueu % 2 == 0)
+                        bool inQueue = false;
+                        for (int k = 0; k < qeueu; k++)
                         {
-                            //Game is ready
-                            if (send(i, "Game is ready\n", strlen("Game is ready\n"), 0) < 0)
+                            if (i == Gamequeue[k])
                             {
-                                printf("Sending.\n");
+                                inQueue = true;
                             }
+                        }
+                        if (!inQueue)
+                        {
+                            printf("The client wants to play\n");
+                            Gamequeue[qeueu++] = i;
+                            sendMsg(i, "Putting you in qeueu\n.Press 1 to exit qeueu.\n");
                         }
                         else
                         {
-                            //Not enough players, put in qeueu
-                            Gameqeueu[qeueu] = i;
-                            if (send(i, "Not enouth players, putting you in qeueu\n.", strlen("Not enouth players, putting you in qeueu\n."), 0) < 0)
-                            {
-                                printf("Sending.\n");
-                            }
+                            //Client wants to exit qeueu
+                            removeFromQeueu(i);
+                            sendMsg(i, Menu());
                         }
+                        printf("Nr of people in qeueu: %d\n", qeueu);
                     }
                     else if (strcmp(buf, cmds[2].c_str()) == 0)
                     { //cmds[2]=="2\n"
