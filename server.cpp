@@ -144,7 +144,7 @@ void sendMsg(int sock, string msg)
 {
     if (send(sock, msg.c_str(), msg.length(), 0) < 0)
     {
-        printf("Sending.\n");
+        printf("Sending msg.\n");
     }
 }
 void newGame(int p1, int p2)
@@ -160,6 +160,29 @@ void newGame(int p1, int p2)
     sendMsg(games[nrOfGames].player2, "You are in a game.\n1:Rock\n2:Paper\n3:Scissors\n");
     //Send rules
     nrOfGames++;
+}
+void endGame(game gameToFind){
+     for (int i = 0; i < nrOfGames; i++)
+    {
+        if (games[i].player1 == gameToFind.player1 || games[i].player2 == gameToFind.player2)
+        {
+            //Found the game
+            sendMsg(games[i].player1, Menu());
+            sendMsg(games[i].player2, Menu());
+            games[i].player1 = 0;
+            games[i].player2 = 0;
+            games[i].p1Set = false;
+            games[i].p2Set = false;
+            games[i].active = false;
+            for (int j = i; j < nrOfGames; j++)
+            {
+                games[j] = games[j + 1];
+            }
+            nrOfGames--;
+            
+            break;
+        }
+    }
 }
 void handleQueue()
 {
@@ -179,12 +202,14 @@ void handleGames()
             //p1 wins
             sendMsg(games[i].player1, "p1 wins\n");
             sendMsg(games[i].player2, "p1 wins\n");
+            endGame(games[i]);
         }
         else if (games[i].player1Score == 3)
         {
             //p2 wins
             sendMsg(games[i].player1, "p2 wins\n");
             sendMsg(games[i].player2, "p2 wins\n");
+            endGame(games[i]);
         }
         else if (games[i].p1Set && games[i].p2Set)
         {
@@ -271,6 +296,7 @@ int checkPlayerStatus(int sock)
     }
     return ret;
 }
+
 int main(int argc, char *argv[])
 {
 
@@ -428,12 +454,15 @@ int main(int argc, char *argv[])
 
                     //Player is NOT in qeueu
                     if (strcmp(buf, cmds[0].c_str()) == 0)
-                    { //cmds[0]=="OK\n"
+                    {   //cmds[0]=="OK\n"
                         //The client supports the prorocols
-                        printf("The client supports the prorocols\n");
-                        if (send(i, Menu().c_str(), Menu().length(), 0) < 0)
+                        if (checkPlayerStatus(i) == 0)//Not in qeueu and not in game
                         {
-                            printf("Sending.\n");
+                            printf("The client supports the prorocols\n");
+                            if (send(i, Menu().c_str(), Menu().length(), 0) < 0)
+                            {
+                                printf("Sending.\n");
+                            }
                         }
                     }
                     else if (strcmp(buf, cmds[1].c_str()) == 0)
