@@ -25,14 +25,17 @@ struct game
     int player2;
     int player1Score = 0;
     int player2Score = 0;
+    int player1choise = 0;
+    int player2choise = 0;
     int rounds = 0;
+    bool startRound = false;
+    bool p1Set, p2Set;
     time_t timer = time(0);
     bool active = false;
 };
+
 int nrOfGames = 0;
 game games[25];
-
-
 
 string removeWord(string str, string word)
 {
@@ -66,56 +69,61 @@ int Winner(int p1, int p2)
     int win = 0;
     //1: Rock 2: Paper 3: Scissors
     //WIN: 1: p1 winns. 2: p2 winns. 0: Draw
-    switch (p1)
+    if (p1 == 1)
     {
-    case 1:
         if (p2 == 1)
-            win = 0;
-        else if (p2 == 2)
-            win = 2;
-        else if (p2 == 3)
-            win = 1;
-        else
-            win = 1;
-
-        break;
-    case 2:
-        if (p2 == 1)
-            win = 1;
-        else if (p2 == 2)
-            win = 0;
-        else if (p2 == 3)
-            win = 2;
-        else
-            win = 1;
-        break;
-    case 3:
-        if (p2 == 1)
-            win = 2;
-        else if (p2 == 2)
-            win = 1;
-        else if (p2 == 3)
-            win = 0;
-        else
-            win = 1;
-        break;
-    default:
-        if (p2 != 1 || p2 != 2 || p2 != 3)
         {
+            //Draw
             win = 0;
         }
-        else
+        else if (p2 == 2)
         {
+            //p2 wins
             win = 2;
         }
-        break;
+        else if (p2 == 3)
+        {
+            //p1 wins
+            win = 1;
+        }
     }
+    else if (p1 == 2)
+    {
+        if (p2 == 1)
+        {
+            //p1 wins
+            win = 1;
+        }
+        else if (p2 == 2)
+        {
+            //Draw
+            win = 0;
+        }
+        else if (p2 == 3)
+        {
+            //p2 wins
+            win = 2;
+        }
+    }
+    else if (p1 == 0)
+    {
+        if (p2 == 0)
+        {
+            //Draw
+            win = 0;
+        }
+        else
+        {
+            //p2 wins
+            win = 2;
+        }
+    }
+    return win;
 }
 string Menu()
 {
     return ("Please select:\n1:Play\n2:Watch\n3:Exit\n");
 }
-
 void removeFromQeueu(int sock)
 {
     for (int i = 0; i < qeueu; i++)
@@ -147,9 +155,122 @@ void newGame(int p1, int p2)
     games[nrOfGames].player2 = p2;
     games[nrOfGames].rounds = 0;
     games[nrOfGames].active = true;
+
+    sendMsg(games[nrOfGames].player1, "You are in a game.\n1:Rock\n2:Paper\n3:Scissors\n");
+    sendMsg(games[nrOfGames].player2, "You are in a game.\n1:Rock\n2:Paper\n3:Scissors\n");
+    //Send rules
     nrOfGames++;
 }
-
+void handleQueue()
+{
+    if (qeueu % 2 == 0 && qeueu > 0)
+    {
+        //There is an equal number of players in qeueu and the is more that 0 players in the qeueu
+        //Start a new Game
+        newGame(Gamequeue[0], Gamequeue[1]);
+    }
+}
+void handleGames()
+{
+    for (int i = 0; i < nrOfGames; i++)
+    {
+        if (games[i].player1Score == 3)
+        {
+            //p1 wins
+            sendMsg(games[i].player1, "p1 wins\n");
+            sendMsg(games[i].player2, "p1 wins\n");
+        }
+        else if (games[i].player1Score == 3)
+        {
+            //p2 wins
+            sendMsg(games[i].player1, "p2 wins\n");
+            sendMsg(games[i].player2, "p2 wins\n");
+        }
+        else if (games[i].p1Set && games[i].p2Set)
+        {
+            printf("Boath players have set theri choises.\n");
+            printf("P1 chose %d\nP2 chose %d\n", games[i].player1choise, games[i].player2choise);
+            int win = Winner(games[i].player1choise, games[i].player2choise);
+            printf("Thw winner of this round is %d\n", win);
+            switch (win)
+            {
+            case 0:
+                //Draw
+                sendMsg(games[i].player1, "Draw\n");
+                sendMsg(games[i].player2, "Draw\n");
+                break;
+            case 1:
+                //p1 socre
+                games[i].player1Score++;
+                sendMsg(games[i].player1, "p1 score\n");
+                sendMsg(games[i].player2, "p1 score\n");
+                break;
+            case 2:
+                //p2 score
+                games[i].player2Score++;
+                sendMsg(games[i].player1, "p2 score\n");
+                sendMsg(games[i].player2, "p2 score\n");
+                break;
+            }
+            printf("P1 score: %d\nP2 score: %d\n", games[i].player1Score, games[i].player2Score);
+            games[i].p1Set = false;
+            games[i].p2Set = false;
+            handleGames();
+        }
+    }
+}
+void setPlayerChoise(int player, int choise)
+{
+    for (int i = 0; i < nrOfGames; i++)
+    {
+        if (player == games[i].player1)
+        {
+            if (!games[i].p1Set)
+            {
+                games[i].player1choise = choise;
+                games[i].p1Set = true;
+                printf("P1 set its choise: %d.\n", choise);
+                break;
+            }
+        }
+        else if (player == games[i].player2)
+        {
+            if (!games[i].p2Set)
+            {
+                games[i].player2choise = choise;
+                games[i].p2Set = true;
+                printf("P2 set its choise: %d.\n", choise);
+                break;
+            }
+        }
+    }
+}
+int checkPlayerStatus(int sock)
+{
+    //1 = in queue. 2 = in game
+    int ret = 0;
+    bool inQueue = false;
+    for (int k = 0; k < qeueu; k++)
+    {
+        if (sock == Gamequeue[k])
+        {
+            inQueue = true;
+            ret = 1;
+            break;
+        }
+    }
+    bool innGame = false;
+    for (int k = 0; k < nrOfGames; k++)
+    {
+        if (sock == games[k].player1 || sock == games[k].player2)
+        {
+            innGame = true;
+            ret = 2;
+            break;
+        }
+    }
+    return ret;
+}
 int main(int argc, char *argv[])
 {
 
@@ -246,6 +367,8 @@ int main(int argc, char *argv[])
     while (true)
     {
         fd_set copy = master;
+        handleQueue();
+        //handleGames();
 
         if (select(fdmax + 1, &copy, NULL, NULL, NULL) == -1)
         {
@@ -283,6 +406,7 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
+
                     //Accept a new message
                     memset(buf, 0, sizeof(buf));
                     bytesRecived = recv(i, buf, sizeof(buf), 0);
@@ -315,46 +439,68 @@ int main(int argc, char *argv[])
                     else if (strcmp(buf, cmds[1].c_str()) == 0)
                     { //cmds[1]=="1\n"
                         //The client wanst to play
-                        bool inQueue = false;
-                        for (int k = 0; k < qeueu; k++)
-                        {
-                            if (i == Gamequeue[k])
-                            {
-                                inQueue = true;
-                            }
-                        }
-                        if (!inQueue)
+                        memset(buf, 0, sizeof(buf));
+                        if (checkPlayerStatus(i) == 0) //not in game or queue
                         {
                             printf("The client wants to play\n");
                             Gamequeue[qeueu++] = i;
                             sendMsg(i, "Putting you in qeueu\n.Press 1 to exit qeueu.\n");
+                            printf("Nr of people in qeueu: %d\n", qeueu);
                         }
-                        else
+                        else if (checkPlayerStatus(i) == 1) //In queue
                         {
                             //Client wants to exit qeueu
                             removeFromQeueu(i);
                             sendMsg(i, Menu());
                         }
-                        printf("Nr of people in qeueu: %d\n", qeueu);
+                        else if (checkPlayerStatus(i) == 2) //In game
+                        {
+                            setPlayerChoise(i, 1);
+                            handleGames();
+                        }
                     }
                     else if (strcmp(buf, cmds[2].c_str()) == 0)
                     { //cmds[2]=="2\n"
                         //The client wats to watch
-                        printf("The client wants to watch\n");
-                        printf("Nr of acrive games: %d\n", nrOfGames);
-                        string allGames = "";
-                        for (int j = 0; j < nrOfGames; j++)
+                        memset(buf, 0, sizeof(buf));
+                        if (checkPlayerStatus(i) == 0) //Not in game or queue
                         {
-                            printf("Game %d\n", j);
+                            printf("The client wants to watch\n");
+                            printf("Nr of acrive games: %d\n", nrOfGames);
+                            string allGames = "";
+                            for (int j = 0; j < nrOfGames; j++)
+                            {
+                                printf("Game %d\n", j);
+                            }
+                        }
+                        else if (checkPlayerStatus(i) == 1) //In queue
+                        {
+                        }
+                        else if (checkPlayerStatus(i) == 2) //In game
+                        {
+                            setPlayerChoise(i, 2);
+                            handleGames();
                         }
                     }
                     else if (strcmp(buf, cmds[3].c_str()) == 0)
                     { //cmds[3]=="3\n"
-                        //The client wats to exit
-                        printf("The client wants to exit\n");
-                        printf("Remove client.\n");
-                        close(i);
-                        FD_CLR(i, &master);
+                        memset(buf, 0, sizeof(buf));
+                        if (checkPlayerStatus(i) == 0) //Not in game or queue
+                        {
+                            //The client wats to exit
+                            printf("The client wants to exit\n");
+                            printf("Remove client.\n");
+                            close(i);
+                            FD_CLR(i, &master);
+                        }
+                        else if (checkPlayerStatus(i) == 1)
+                        { //In queue
+                        }
+                        else if (checkPlayerStatus(i) == 2)
+                        { //In game
+                            setPlayerChoise(i, 3);
+                            handleGames();
+                        }
                     }
                     else
                     {
