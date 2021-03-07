@@ -195,6 +195,11 @@ void endGame(game gameToFind)
             games[i].p1Set = false;
             games[i].p2Set = false;
             games[i].active = false;
+            for(int j = 0; j <games[i].nrOfspectators; j++){
+                sendMsg(games[i].spectators[j], Menu());
+                games[i].spectators[j] = 0;
+            }
+            games[i].nrOfspectators = 0;
             for (int j = i; j < nrOfGames; j++)
             {
                 games[j] = games[j + 1];
@@ -219,6 +224,11 @@ void endGame(int player)
             games[i].p1Set = false;
             games[i].p2Set = false;
             games[i].active = false;
+            for(int j = 0; j <games[i].nrOfspectators; j++){
+                sendMsg(games[i].spectators[j], Menu());
+                games[i].spectators[j] = 0;
+            }
+            games[i].nrOfspectators = 0;
             for (int j = i; j < nrOfGames; j++)
             {
                 games[j] = games[j + 1];
@@ -393,13 +403,15 @@ void addSpectator(int client, int gameNr)
                 watchQueue[j] = watchQueue[j+1];
             }
             sendMsg(client, "You are being proccesed.\n");
+            nrInWatchQueue--;
             break;
         }
     }
     if (games[gameNr].nrOfspectators < 10)
     {
         sendMsg(client, "You are now a spectator.\n");
-        games[gameNr].spectators[games[nrOfGames].nrOfspectators++] = client;
+        games[gameNr].spectators[games[gameNr].nrOfspectators++] = client;
+        sendMsg(games[gameNr].spectators[games[gameNr].nrOfspectators-1], "You will recive messages like this.\n");
     }
     else
     {
