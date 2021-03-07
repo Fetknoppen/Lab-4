@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 /* You will to add includes here */
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <string.h>
@@ -34,6 +36,9 @@ struct game
     bool p1Set, p2Set;
     time_t timer = time(0);
     bool active = false;
+    time_t startTime;
+    int count;
+    struct itimerval alarmTime;
 };
 
 int nrOfGames = 0;
@@ -88,6 +93,9 @@ int Winner(int p1, int p2)
             //p1 wins
             win = 1;
         }
+        else if(p2 == 0){
+            win = 1;
+        }
     }
     else if (p1 == 2)
     {
@@ -106,6 +114,9 @@ int Winner(int p1, int p2)
             //p2 wins
             win = 2;
         }
+        else if(p2 == 0){
+            win = 1;
+        }
     }
     else if (p1 == 3)
     {
@@ -123,6 +134,9 @@ int Winner(int p1, int p2)
         {
             //Draw
             win = 0;
+        }
+        else if(p2 == 0){
+            win = 1;
         }
     }
     else if (p1 == 0)
@@ -167,20 +181,7 @@ void sendMsg(int sock, string msg)
         printf("Sending msg.\n");
     }
 }
-void newGame(int p1, int p2)
-{
-    removeFromQeueu(p1);
-    removeFromQeueu(p2);
-    games[nrOfGames].player1 = p1;
-    games[nrOfGames].player2 = p2;
-    games[nrOfGames].rounds = 0;
-    games[nrOfGames].active = true;
 
-    sendMsg(games[nrOfGames].player1, "You are in a game.\n1:Rock\n2:Paper\n3:Scissors\n");
-    sendMsg(games[nrOfGames].player2, "You are in a game.\n1:Rock\n2:Paper\n3:Scissors\n");
-    //Send rules
-    nrOfGames++;
-}
 void endGame(game gameToFind)
 {
     for (int i = 0; i < nrOfGames; i++)
@@ -195,7 +196,8 @@ void endGame(game gameToFind)
             games[i].p1Set = false;
             games[i].p2Set = false;
             games[i].active = false;
-            for(int j = 0; j <games[i].nrOfspectators; j++){
+            for (int j = 0; j < games[i].nrOfspectators; j++)
+            {
                 sendMsg(games[i].spectators[j], Menu());
                 games[i].spectators[j] = 0;
             }
@@ -224,7 +226,8 @@ void endGame(int player)
             games[i].p1Set = false;
             games[i].p2Set = false;
             games[i].active = false;
-            for(int j = 0; j <games[i].nrOfspectators; j++){
+            for (int j = 0; j < games[i].nrOfspectators; j++)
+            {
                 sendMsg(games[i].spectators[j], Menu());
                 games[i].spectators[j] = 0;
             }
@@ -239,15 +242,6 @@ void endGame(int player)
         }
     }
 }
-void handleQueue()
-{
-    if (qeueu % 2 == 0 && qeueu > 0)
-    {
-        //There is an equal number of players in qeueu and the is more that 0 players in the qeueu
-        //Start a new Game
-        newGame(Gamequeue[0], Gamequeue[1]);
-    }
-}
 void handleGames()
 {
     for (int i = 0; i < nrOfGames; i++)
@@ -255,8 +249,8 @@ void handleGames()
         if (games[i].player1Score == 3)
         {
             //p1 wins
-            sendMsg(games[i].player1, "p1 wins\n");
-            sendMsg(games[i].player2, "p1 wins\n");
+            sendMsg(games[i].player1, "You win\n");
+            sendMsg(games[i].player2, "You loose\n");
             for (int j = 0; j < games[i].nrOfspectators; j++)
             {
                 sendMsg(games[i].spectators[j], "p1 wins\n");
@@ -266,8 +260,8 @@ void handleGames()
         else if (games[i].player2Score == 3)
         {
             //p2 wins
-            sendMsg(games[i].player1, "p2 wins\n");
-            sendMsg(games[i].player2, "p2 wins\n");
+            sendMsg(games[i].player1, "You loose\n");
+            sendMsg(games[i].player2, "You win\n");
             for (int j = 0; j < games[i].nrOfspectators; j++)
             {
                 sendMsg(games[i].spectators[j], "p2 wins\n");
@@ -294,8 +288,8 @@ void handleGames()
             case 1:
                 //p1 socre
                 games[i].player1Score++;
-                sendMsg(games[i].player1, "p1 score\n");
-                sendMsg(games[i].player2, "p1 score\n");
+                sendMsg(games[i].player1, "You score\n");
+                sendMsg(games[i].player2, "Your opponent scores\n");
                 for (int j = 0; j < games[i].nrOfspectators; j++)
                 {
                     sendMsg(games[i].spectators[j], "p1 score\n");
@@ -304,19 +298,116 @@ void handleGames()
             case 2:
                 //p2 score
                 games[i].player2Score++;
-                sendMsg(games[i].player1, "p2 score\n");
-                sendMsg(games[i].player2, "p2 score\n");
+                sendMsg(games[i].player1, "Your opponent scores\n");
+                sendMsg(games[i].player2, "You score\n");
                 for (int j = 0; j < games[i].nrOfspectators; j++)
                 {
                     sendMsg(games[i].spectators[j], "p2 score\n");
                 }
                 break;
             }
+            string msg = "Start.\n1:Rock\n2:Paper\n3:Scissors\n";
+            sendMsg(games[i].player1, msg);
+            sendMsg(games[i].player2, msg);
+
             printf("P1 score: %d\nP2 score: %d\n", games[i].player1Score, games[i].player2Score);
             games[i].p1Set = false;
             games[i].p2Set = false;
             handleGames();
         }
+    }
+}
+void test(int signum)
+{
+    for (int i = 0; i < nrOfGames; i++)
+    {
+        if (!games[i].active)
+        {
+            if (games[i].count > 0)
+            {
+                string msg = to_string(games[i].count--) + " seconds unitl start.\n";
+                sendMsg(games[i].player1, msg);
+                sendMsg(games[i].player2, msg);
+                for (int j = 0; j < games[i].nrOfspectators; j++)
+                {
+                    sendMsg(games[i].spectators[j], msg);
+                }
+            }
+            else
+            {
+                string msg = "Start.\n1:Rock\n2:Paper\n3:Scissors\n";
+                sendMsg(games[i].player1, msg);
+                sendMsg(games[i].player2, msg);
+                for (int j = 0; j < games[i].nrOfspectators; j++)
+                {
+                    sendMsg(games[i].spectators[j], msg);
+                }
+                games[i].active = true;
+                games[i].count = 0;
+            }
+        }
+        else
+        {
+            if (games[i].count++ == 2)
+            {
+                if (games[i].p1Set && games[i].p2Set)
+                {
+                    handleGames();
+                }
+                else if (!games[i].p1Set || !games[i].p2Set)
+                {
+                    if (!games[i].p1Set && !games[i].p2Set)
+                    {
+                        games[i].player1choise = 0;
+                        games[i].player2choise = 0;
+                        games[i].p1Set = true;
+                        games[i].p2Set = true;
+                    }
+                    else if (!games[i].p1Set && games[i].p2Set)
+                    {
+                        games[i].player1choise = 0;
+                        games[i].p1Set = true;
+                    }
+                    else if (games[i].p1Set && !games[i].p2Set)
+                    {
+                        games[i].player2choise = 0;
+                        games[i].p2Set = true;
+                    }
+                    handleGames();
+                }
+                games[i].count = 0;
+            }
+        }
+    }
+}
+void newGame(int p1, int p2)
+{
+    removeFromQeueu(p1);
+    removeFromQeueu(p2);
+    games[nrOfGames].player1 = p1;
+    games[nrOfGames].player2 = p2;
+    games[nrOfGames].rounds = 0;
+    //games[nrOfGames].active = true;
+    games[nrOfGames].startTime = time(0);
+    games[nrOfGames].count = 3;
+
+    games[nrOfGames].alarmTime.it_interval.tv_sec = 1;
+    games[nrOfGames].alarmTime.it_interval.tv_usec = 1;
+    games[nrOfGames].alarmTime.it_value.tv_sec = 1;
+    games[nrOfGames].alarmTime.it_value.tv_usec = 1;
+    /* Regiter a callback function, associated with the SIGALRM signal, which will be raised when the alarm goes of */
+    signal(SIGALRM, test);
+    setitimer(ITIMER_REAL, &games[nrOfGames].alarmTime, NULL); // Start/register the alarm.
+
+    nrOfGames++;
+}
+void handleQueue()
+{
+    if (qeueu % 2 == 0 && qeueu > 0)
+    {
+        //There is an equal number of players in qeueu and the is more that 0 players in the qeueu
+        //Start a new Game
+        newGame(Gamequeue[0], Gamequeue[1]);
     }
 }
 void setPlayerChoise(int player, int choise)
@@ -396,22 +487,26 @@ int checkPlayerStatus(int sock)
 }
 void addSpectator(int client, int gameNr)
 {
-    for(int k = 0; k < nrInWatchQueue; k++){
-        if(client == watchQueue[k]){
+    for (int k = 0; k < nrInWatchQueue; k++)
+    {
+        if (client == watchQueue[k])
+        {
             //Found client
-            for(int j = k; j < nrInWatchQueue; j++){
-                watchQueue[j] = watchQueue[j+1];
+            for (int j = k; j < nrInWatchQueue; j++)
+            {
+                watchQueue[j] = watchQueue[j + 1];
             }
-            sendMsg(client, "You are being proccesed.\n");
+            //sendMsg(client, "You are being proccesed.\n");
             nrInWatchQueue--;
             break;
         }
     }
     if (games[gameNr].nrOfspectators < 10)
     {
-        sendMsg(client, "You are now a spectator.\n");
+        string msg = "You are now spectating game " + to_string(gameNr) + "\n";
+        sendMsg(client, msg);
         games[gameNr].spectators[games[gameNr].nrOfspectators++] = client;
-        sendMsg(games[gameNr].spectators[games[gameNr].nrOfspectators-1], "You will recive messages like this.\n");
+        sendMsg(games[gameNr].spectators[games[gameNr].nrOfspectators - 1], "Press 1, 2 or 3 to exit the game.\n");
     }
     else
     {
@@ -430,6 +525,24 @@ void addToSpectatorQueue(int client)
         sendMsg(client, "Cant fit any more spectators.\n");
     }
 }
+void removeFromWatch(int client)
+{
+    for (int i = 0; i < nrOfGames; i++)
+    {
+        for (int j = 0; j < games[i].nrOfspectators; j++)
+        {
+            if (games[i].spectators[j] == client)
+            {
+                for (int k = j; k < games[i].nrOfspectators; k++)
+                {
+                    games[i].spectators[k] = games[i].spectators[k + 1];
+                }
+                break;
+            }
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -527,13 +640,21 @@ int main(int argc, char *argv[])
     {
         fd_set copy = master;
         handleQueue();
-        //handleGames();
+        //handleGames(1);
 
         if (select(fdmax + 1, &copy, NULL, NULL, NULL) == -1)
         {
-            printf("select.\n");
-            close(listener);
-            exit(1);
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            else
+            {
+                printf("select.\n");
+                printf("%s\n", strerror(errno));
+                close(listener);
+                exit(1);
+            }
         }
 
         for (int i = 0; i < fdmax + 1; i++)
@@ -569,7 +690,7 @@ int main(int argc, char *argv[])
                     bytesRecived = recv(i, buf, sizeof(buf), 0);
                     if (checkPlayerStatus(i) == 4) //Spectating queue
                     {
-                        sendMsg(i, "Lokking for your game.\n");
+                        //sendMsg(i, "Lokking for your game.\n");
                         sendMsg(i, buf);
                         if (bytesRecived <= 0)
                         {
@@ -580,12 +701,12 @@ int main(int argc, char *argv[])
                         {
                             for (int j = 0; j < nrOfGames; j++)
                             {
-                                sendMsg(i, to_string(j));
-                                sendMsg(i, "\n");
-                                if (atoi(buf)==j)
+                                //sendMsg(i, to_string(j));
+                                //sendMsg(i, "\n");
+                                if (atoi(buf) == j)
                                 {
                                     //Found the game
-                                    sendMsg(i, "Found your game.\n");
+                                    //sendMsg(i, "Found your game.\n");
                                     addSpectator(i, j);
                                     break;
                                 }
@@ -608,8 +729,9 @@ int main(int argc, char *argv[])
                             }
                             else if (checkPlayerStatus(i) == 3) //spectating
                             {
+                                removeFromWatch(i);
                             }
-                            printf("Remove client.\n");
+                            //printf("Remove client.\n");
                             close(i);
                             FD_CLR(i, &master);
                         }
@@ -628,7 +750,8 @@ int main(int argc, char *argv[])
                             //The client supports the prorocols
                             if (checkPlayerStatus(i) == 0) //Not in qeueu and not in game
                             {
-                                printf("The client supports the prorocols\n");
+                                //printf("The client supports the prorocols\n");
+                                printf("New client.\n");
                                 if (send(i, Menu().c_str(), Menu().length(), 0) < 0)
                                 {
                                     printf("Sending.\n");
@@ -641,10 +764,10 @@ int main(int argc, char *argv[])
                             memset(buf, 0, sizeof(buf));
                             if (checkPlayerStatus(i) == 0) //not in game or queue
                             {
-                                printf("The client wants to play\n");
+                                //printf("The client wants to play\n");
                                 Gamequeue[qeueu++] = i;
                                 sendMsg(i, "Putting you in qeueu\n.Press 1 to exit qeueu.\n");
-                                printf("Nr of people in qeueu: %d\n", qeueu);
+                                //printf("Nr of people in qeueu: %d\n", qeueu);
                             }
                             else if (checkPlayerStatus(i) == 1) //In queue
                             {
@@ -655,10 +778,12 @@ int main(int argc, char *argv[])
                             else if (checkPlayerStatus(i) == 2) //In game
                             {
                                 setPlayerChoise(i, 1);
-                                handleGames();
+                                //handleGames(1);
                             }
                             else if (checkPlayerStatus(i) == 3) //spectating
                             {
+                                removeFromWatch(i);
+                                sendMsg(i, Menu());
                             }
                         }
                         else if (strcmp(buf, cmds[2].c_str()) == 0)
@@ -667,16 +792,24 @@ int main(int argc, char *argv[])
                             memset(buf, 0, sizeof(buf));
                             if (checkPlayerStatus(i) == 0) //Not in game or queue
                             {
-                                printf("The client wants to watch\n");
-                                printf("Nr of acrive games: %d\n", nrOfGames);
-                                string allGames = "";
-                                for (int j = 0; j < nrOfGames; j++)
+                                //printf("The client wants to watch\n");
+                                //printf("Nr of acrive games: %d\n", nrOfGames);
+                                if (nrOfGames > 0)
                                 {
-                                    printf("Game %d\n", j);
-                                    allGames += "Game " + to_string(j) + "\n";
+                                    string allGames = "";
+                                    for (int j = 0; j < nrOfGames; j++)
+                                    {
+                                        //printf("Game %d\n", j);
+                                        allGames += "Game " + to_string(j) + "\n";
+                                    }
+                                    sendMsg(i, allGames);
+                                    addToSpectatorQueue(i);
                                 }
-                                sendMsg(i, allGames);
-                                addToSpectatorQueue(i);
+                                else
+                                {
+                                    sendMsg(i, "No active games.\n");
+                                    sendMsg(i, Menu());
+                                }
                             }
                             else if (checkPlayerStatus(i) == 1) //In queue
                             {
@@ -684,10 +817,12 @@ int main(int argc, char *argv[])
                             else if (checkPlayerStatus(i) == 2) //In game
                             {
                                 setPlayerChoise(i, 2);
-                                handleGames();
+                                //handleGames(1);
                             }
                             else if (checkPlayerStatus(i) == 3) //spectating
                             {
+                                removeFromWatch(i);
+                                sendMsg(i, Menu());
                             }
                         }
                         else if (strcmp(buf, cmds[3].c_str()) == 0)
@@ -696,8 +831,8 @@ int main(int argc, char *argv[])
                             if (checkPlayerStatus(i) == 0) //Not in game or queue
                             {
                                 //The client wats to exit
-                                printf("The client wants to exit\n");
-                                printf("Remove client.\n");
+                                //printf("The client wants to exit\n");
+                                //printf("Remove client.\n");
                                 close(i);
                                 FD_CLR(i, &master);
                             }
@@ -707,15 +842,17 @@ int main(int argc, char *argv[])
                             else if (checkPlayerStatus(i) == 2)
                             { //In game
                                 setPlayerChoise(i, 3);
-                                handleGames();
+                                //handleGames(1);
                             }
                             else if (checkPlayerStatus(i) == 3) //spectating
                             {
+                                removeFromWatch(i);
+                                sendMsg(i, Menu());
                             }
                         }
                         else
                         {
-                            printf("Wrong command. You sent: %s", buf);
+                            //printf("Wrong command. You sent: %s", buf);
                         }
 
                         //printf("New message.\n");
