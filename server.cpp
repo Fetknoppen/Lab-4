@@ -22,6 +22,7 @@ int watchQueue[50];
 int nrInWatchQueue = 0;
 float top[5];
 int nrInTop = 0;
+string top5;
 
 struct game
 {
@@ -31,13 +32,16 @@ struct game
     int player2Score = 0;
     int player1choise = 0;
     int player2choise = 0;
-    float p1time = 0;
-    float p2time = 0;
-    float p1totTime = 0;
-    float p2totTime = 0;
+    time_t p1time = 0;
+    time_t p2time = 0;
+    time_t p1totTime = 0;
+    time_t p2totTime = 0;
+    bool p1Ready = false;
+    bool p2Ready = false;
     int nrOfspectators = 0;
     int spectators[10];
     int rounds = 0;
+    int maxRounds = 12;
     bool startRound = false;
     bool p1Set, p2Set;
     bool active = false;
@@ -49,16 +53,50 @@ struct game
 int nrOfGames = 0;
 game games[25];
 
-void putInTop(float time)
+void refreshTop()
 {
+    printf("REfresing top.\n");
+    top5 = "Top 5:\n";
     for (int i = 0; i < nrInTop; i++)
     {
-        if (time < top[i])
+        top5 += to_string(i + 1) + ": " + to_string(top[i]) + "\n";
+    }
+}
+void putInTop(time_t time)
+{
+    printf("New top????\n");
+    if (nrInTop > 5)
+    {
+        for (int i = 0; i < nrInTop; i++)
         {
-            top[i] = time;
-            break;
+            if (time < top[i])
+            {
+                printf("New top time.\n");
+                top[i] = time;
+                break;
+            }
         }
     }
+    else if (nrInTop > 0)
+    {
+        for (int i = 0; i < nrInTop; i++)
+        {
+            if (time < top[i])
+            {
+                printf("New top time.\n");
+                top[i] = time;
+                break;
+            }
+        }
+        printf("New last.\n");
+        top[nrInTop++] = time;
+    }
+    else if (nrInTop == 0)
+    {
+        printf("Fist game!!.\n");
+        top[nrInTop++] = time;
+    }
+    refreshTop();
 }
 string removeWord(string str, string word)
 {
@@ -175,7 +213,7 @@ int Winner(int p1, int p2)
 }
 string Menu()
 {
-    return ("Please select:\n1:Play\n2:Watch\n3:Exit\n");
+    return ("Please select:\n1:Play\n2:Watch\n3:Exit\n4:Top 5\n");
 }
 void removeFromQeueu(int sock)
 {
@@ -209,8 +247,6 @@ void endGame(game gameToFind)
             //Found the game
             sendMsg(games[i].player1, Menu());
             sendMsg(games[i].player2, Menu());
-            putInTop(games[i].p1totTime / 3);
-            putInTop(games[i].p2totTime / 3);
             games[i].player1 = 0;
             games[i].player2 = 0;
             games[i].p1Set = false;
@@ -241,8 +277,8 @@ void endGame(int player)
             //Found the game
             sendMsg(games[i].player1, Menu());
             sendMsg(games[i].player2, Menu());
-            putInTop(games[i].p1totTime / 3);
-            putInTop(games[i].p2totTime / 3);
+            putInTop(games[i].p1totTime / games[i].rounds);
+            putInTop(games[i].p2totTime / games[i].rounds);
             games[i].player1 = 0;
             games[i].player2 = 0;
             games[i].p1Set = false;
@@ -264,36 +300,79 @@ void endGame(int player)
         }
     }
 }
+void checkForWinner(game &theGame)
+{
+    if (theGame.player1Score == 3)
+    {
+        //p1 wins
+        sendMsg(theGame.player1, "You win\n");
+        sendMsg(theGame.player2, "You loose\n");
+        for (int j = 0; j < theGame.nrOfspectators; j++)
+        {
+            sendMsg(theGame.spectators[j], "p1 wins\n");
+        }
+        float time = theGame.p1totTime / theGame.rounds;
+        printf("Is this a new best? %f\n", time);
+        putInTop(theGame.p1totTime / theGame.rounds);
+        endGame(theGame);
+    }
+    else if (theGame.player2Score == 3)
+    {
+        //p2 wins
+        sendMsg(theGame.player1, "You loose\n");
+        sendMsg(theGame.player2, "You win\n");
+        for (int j = 0; j < theGame.nrOfspectators; j++)
+        {
+            sendMsg(theGame.spectators[j], "p2 wins\n");
+        }
+        float time = theGame.p1totTime / theGame.rounds;
+        printf("Is this a new best? %f\n", time);
+        putInTop(theGame.p2totTime / theGame.rounds);
+        endGame(theGame);
+    }
+}
 void handleGames()
 {
     for (int i = 0; i < nrOfGames; i++)
     {
-        if (games[i].player1Score == 3)
+        if (games[i].rounds++ == games[i].maxRounds)
         {
             //p1 wins
-            sendMsg(games[i].player1, "You win\n");
-            sendMsg(games[i].player2, "You loose\n");
-            for (int j = 0; j < games[i].nrOfspectators; j++)
+            if (games[i].player1Score > games[i].player2Score)
             {
-                sendMsg(games[i].spectators[j], "p1 wins\n");
+                sendMsg(games[i].player1, "The maximum number of rounds is reached, player 1 wins!\n");
+                sendMsg(games[i].player2, "The maximum number of rounds is reached, player 1 wins!\n");
+                for (int j = 0; j < games[i].nrOfspectators; j++)
+                {
+                    sendMsg(games[i].spectators[j], "The maximum number of rounds is reached, player 1 wins!\n");
+                }
+            }
+            else if (games[i].player2Score > games[i].player1Score)
+            {
+                sendMsg(games[i].player1, "The maximum number of rounds is reached, player 2 wins!\n");
+                sendMsg(games[i].player2, "The maximum number of rounds is reached, player 2 wins!\n");
+                for (int j = 0; j < games[i].nrOfspectators; j++)
+                {
+                    sendMsg(games[i].spectators[j], "The maximum number of rounds is reached, player 2 wins!\n");
+                }
+            }
+            else if (games[i].player1Score == games[i].player2Score)
+            {
+                sendMsg(games[i].player1, "The maximum number of rounds is reached, Draw!\n");
+                sendMsg(games[i].player2, "The maximum number of rounds is reached, Draw!\n");
+                for (int j = 0; j < games[i].nrOfspectators; j++)
+                {
+                    sendMsg(games[i].spectators[j], "The maximum number of rounds is reached, Draw!\n");
+                }
             }
             endGame(games[i]);
-        }
-        else if (games[i].player2Score == 3)
-        {
-            //p2 wins
-            sendMsg(games[i].player1, "You loose\n");
-            sendMsg(games[i].player2, "You win\n");
-            for (int j = 0; j < games[i].nrOfspectators; j++)
-            {
-                sendMsg(games[i].spectators[j], "p2 wins\n");
-            }
-            endGame(games[i]);
+            return;
         }
         else if (games[i].p1Set && games[i].p2Set)
         {
-            games[i].p1totTime += games[i].p1time;
-            games[i].p2totTime += games[i].p2time;
+            games[i].p1totTime += games[i].p1time - games[i].startTime;
+            games[i].p2totTime += games[i].p2time - games[i].startTime;
+            printf("Player 1 awnserd in %ld seconds.\nPlayer 2 awnserd in %ld seconds.\n", games[i].p1time - games[i].startTime, games[i].p2time - games[i].startTime);
             printf("Boath players have set theri choises.\n");
             printf("P1 chose %d\nP2 chose %d\n", games[i].player1choise, games[i].player2choise);
             int win = Winner(games[i].player1choise, games[i].player2choise);
@@ -333,11 +412,12 @@ void handleGames()
             string msg = "Start.\n1:Rock\n2:Paper\n3:Scissors\n";
             sendMsg(games[i].player1, msg);
             sendMsg(games[i].player2, msg);
-
             printf("P1 score: %d\nP2 score: %d\n", games[i].player1Score, games[i].player2Score);
             games[i].p1Set = false;
             games[i].p2Set = false;
-            //handleGames();
+            checkForWinner(games[i]);
+            games[i].startTime = time(0);
+            printf("Start timer.\n");
         }
     }
 }
@@ -369,6 +449,7 @@ void test(int signum)
                 games[i].active = true;
                 games[i].count = 0;
                 games[i].startTime = time(0);
+                printf("Start timer.\n");
             }
         }
         else
@@ -378,6 +459,7 @@ void test(int signum)
             {
                 if (games[i].p1Set && games[i].p2Set)
                 {
+                    games[i].count = 0;
                     handleGames();
                 }
                 else if (!games[i].p1Set || !games[i].p2Set)
@@ -403,8 +485,8 @@ void test(int signum)
                         games[i].p2Set = true;
                         games[i].p2time = time(0);
                     }
-                    handleGames();
                     games[i].count = 0;
+                    handleGames();
                 }
             }
             else
@@ -430,6 +512,9 @@ void newGame(int p1, int p2)
     //games[nrOfGames].active = true;
     //games[nrOfGames].startTime = time(0);
     games[nrOfGames].count = 3;
+    games[nrOfGames].maxRounds = 12;
+    games[nrOfGames].p1totTime = 0;
+    games[nrOfGames].p2totTime = 0;
 
     games[nrOfGames].alarmTime.it_interval.tv_sec = 1;
     games[nrOfGames].alarmTime.it_interval.tv_usec = 1;
@@ -615,7 +700,7 @@ int main(int argc, char *argv[])
     int nrOfClient = 0;
     int yes = 1;
     int bytesRecived;
-    string cmds[4] = {"OK\n", "1\n", "2\n", "3\n"};
+    string cmds[5] = {"OK\n", "1\n", "2\n", "3\n", "4\n"};
 
     struct addrinfo hint, *servinfo, *p;
     memset(&hint, 0, sizeof(hint));
@@ -891,6 +976,10 @@ int main(int argc, char *argv[])
                                 removeFromWatch(i);
                                 sendMsg(i, Menu());
                             }
+                        }
+                        else if (strcmp(buf, cmds[4].c_str()) == 0)
+                        {
+                            sendMsg(i, top5);
                         }
                         else
                         {
