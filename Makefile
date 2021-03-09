@@ -1,10 +1,10 @@
-all: server client
+all: sspd sspgame
 
-server: server.o
-		$(CXX) -L./ -Wall -o server server.o
+sspd: server.o
+		$(CXX) -L./ -Wall -o sspd server.o
 
-client: client.o
-		$(CXX) -L./ -Wall -o client client.o
+sspgame: client.o
+		$(CXX) -L./ -Wall -o sspgame client.o
 
 clean:
-		rm *.o server client
+		rm *.o sspd sspgame
