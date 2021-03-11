@@ -275,10 +275,9 @@ void endGame(int player)
         if (games[i].player1 == player || games[i].player2 == player)
         {
             //Found the game
+            printf("Found the game to end.\n");
             sendMsg(games[i].player1, Menu());
             sendMsg(games[i].player2, Menu());
-            putInTop(games[i].p1totTime / games[i].rounds);
-            putInTop(games[i].p2totTime / games[i].rounds);
             games[i].player1 = 0;
             games[i].player2 = 0;
             games[i].p1Set = false;
@@ -852,6 +851,8 @@ int main(int argc, char *argv[])
                             }
                             else if (checkPlayerStatus(i) == 2) //In game
                             {
+                                printf("A player left the game.\n");
+
                                 endGame(i);
                             }
                             else if (checkPlayerStatus(i) == 3) //spectating
@@ -859,6 +860,7 @@ int main(int argc, char *argv[])
                                 removeFromWatch(i);
                             }
                             //printf("Remove client.\n");
+                            nrOfClient--;
                             close(i);
                             FD_CLR(i, &master);
                         }
@@ -871,7 +873,6 @@ int main(int argc, char *argv[])
                     0: Exit
                     */
 
-                        //Player is NOT in qeueu
                         if (strcmp(buf, cmds[0].c_str()) == 0)
                         { //cmds[0]=="OK\n"
                             //The client supports the prorocols
@@ -960,6 +961,7 @@ int main(int argc, char *argv[])
                                 //The client wats to exit
                                 //printf("The client wants to exit\n");
                                 //printf("Remove client.\n");
+                                nrOfClient--;
                                 close(i);
                                 FD_CLR(i, &master);
                             }
@@ -979,7 +981,16 @@ int main(int argc, char *argv[])
                         }
                         else if (strcmp(buf, cmds[4].c_str()) == 0)
                         {
-                            sendMsg(i, top5);
+                            if (top5 != "")
+                            {
+                                sendMsg(i, top5);
+                            }
+                            else
+                            {
+                                sendMsg(i, "Nobody in the top 5.\n");
+                            }
+
+                            sendMsg(i, Menu());
                         }
                         else
                         {
